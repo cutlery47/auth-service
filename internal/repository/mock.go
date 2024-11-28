@@ -1,9 +1,11 @@
 package repository
 
 import (
+	"context"
 	"sync"
 
 	"github.com/Microsoft/go-winio/pkg/guid"
+	"github.com/cutlery47/auth-service/internal/config"
 	"github.com/cutlery47/auth-service/internal/models"
 	"github.com/google/uuid"
 )
@@ -11,16 +13,20 @@ import (
 type MockRepository struct {
 	tokens []models.OutRefresh
 	mu     *sync.RWMutex
+
+	conf config.Repository
 }
 
-func NewMock() *MockRepository {
+func NewMock(conf config.Repository) *MockRepository {
 	return &MockRepository{
 		tokens: []models.OutRefresh{},
 		mu:     &sync.RWMutex{},
+
+		conf: conf,
 	}
 }
 
-func (mr *MockRepository) Create(refresh models.InRefresh) error {
+func (mr *MockRepository) Create(ctx context.Context, refresh models.InRefresh) error {
 	id := uuid.New()
 
 	entry := models.OutRefresh{
@@ -35,7 +41,7 @@ func (mr *MockRepository) Create(refresh models.InRefresh) error {
 	return nil
 }
 
-func (mr *MockRepository) Get(id guid.GUID) (models.OutRefresh, error) {
+func (mr *MockRepository) Get(ctx context.Context, id guid.GUID) (models.OutRefresh, error) {
 	mr.mu.RLock()
 	defer mr.mu.RUnlock()
 
@@ -46,4 +52,8 @@ func (mr *MockRepository) Get(id guid.GUID) (models.OutRefresh, error) {
 	}
 
 	return models.OutRefresh{}, ErrNotFound
+}
+
+func (mr *MockRepository) GetEmail(ctx context.Context, id guid.GUID) (string, error) {
+	return mr.conf.Receiver, nil
 }

@@ -1,9 +1,11 @@
 package service
 
 import (
+	"context"
 	"crypto/sha512"
 	"errors"
 	"fmt"
+	"net/smtp"
 
 	"github.com/Microsoft/go-winio/pkg/guid"
 	"github.com/cutlery47/auth-service/internal/config"
@@ -15,23 +17,34 @@ import (
 )
 
 type Service interface {
-	Create(id guid.GUID, ip string) (access, refresh string, err error)
-	Refresh(id guid.GUID, ip, refresh string) (newAccess, newRefresh string, err error)
+	Create(ctx context.Context, id guid.GUID, ip string) (access, refresh string, err error)
+	Refresh(ctx context.Context, id guid.GUID, ip, refresh string) (newAccess, newRefresh string, err error)
 }
 
 type AuthService struct {
 	repo repository.Repository
+	auth smtp.Auth
+
 	conf config.Service
 }
 
-func New(repo repository.Repository, conf config.Service) *AuthService {
+func NewAuthService(repo repository.Repository, conf config.Service) *AuthService {
+	// при инициализации сервиса производим smtp-авторизацию
+	auth := smtp.PlainAuth(
+		"",
+		conf.SMTP.Username,
+		conf.SMTP.Password,
+		conf.SMTP.Hostname,
+	)
+
 	return &AuthService{
 		repo: repo,
+		auth: auth,
 		conf: conf,
 	}
 }
 
-func (as *AuthService) Create(id guid.GUID, ip string) (access, refresh string, err error) {
+func (as *AuthService) Create(ctx context.Context, id guid.GUID, ip string) (access, refresh string, err error) {
 	// создаем access и refresh JWT-токены
 	accessToken := generateToken(id, ip, as.conf.AccessTTL)
 	refreshToken := generateToken(id, ip, as.conf.RefreshTTL)
@@ -73,14 +86,14 @@ func (as *AuthService) Create(id guid.GUID, ip string) (access, refresh string, 
 	}
 
 	// заносим информацию о новом refresh-токене в хранилище
-	if err := as.repo.Create(inRefresh); err != nil {
+	if err := as.repo.Create(ctx, inRefresh); err != nil {
 		return "", "", err
 	}
 
 	return signedAccess, signedRefresh, nil
 }
 
-func (as *AuthService) Refresh(id guid.GUID, ip, refresh string) (newAccess, newRefresh string, err error) {
+func (as *AuthService) Refresh(ctx context.Context, id guid.GUID, ip, refresh string) (newAccess, newRefresh string, err error) {
 	refreshClaims := jwt.MapClaims{}
 
 	// Парсинг и валидация refresh-токена
@@ -106,17 +119,21 @@ func (as *AuthService) Refresh(id guid.GUID, ip, refresh string) (newAccess, new
 
 	// Сверяем ip-адрес внутри токена с адресом, с которого поступил запрос
 	// В случае несовпадения - посылаем письмо на почту пользователя, id которого указан в токене
+	// В принципе, можно было отслылать письма асинхронно, но в данном случае решил не заморачиваться
 	if ip != refreshIp {
-		return "", "", as.sendWarning(refreshId)
+		if err := as.sendWarning(ctx, refreshId, ip); err != nil {
+			return "", "", err
+		}
+		return "", "", ErrWrongIp
 	}
 
-	storedRefresh, err := as.repo.Get(id)
+	storedRefresh, err := as.repo.Get(ctx, id)
 	if err != nil {
 		return "", "", err
 	}
 
-	// Проверяем, сходится ли токен, полученный от пользователя с токеном, лежащим в БД
-	// Для этого, нам нужно:
+	// Проверяем сходится ли токен, полученный от пользователя, с токеном, лежащим в БД
+	// Для этого нам нужно:
 	// 1) К полученному токену добавить ту же соль, которая использовалась изначально
 	// 2) Захэшировать полученный токен при помощи SHA512
 	// 3) Сравнить bcrypt-хэши
@@ -139,9 +156,26 @@ func (as *AuthService) Refresh(id guid.GUID, ip, refresh string) (newAccess, new
 		return "", "", fmt.Errorf("bcrypt.CompareHashAndPassword: %v", err)
 	}
 
-	return as.Create(id, ip)
+	// валидация прошла успешно - создаем новую пару токенов
+	return as.Create(ctx, id, ip)
 }
 
-func (as *AuthService) sendWarning(id string) error {
-	return ErrWrongIp
+func (as *AuthService) sendWarning(ctx context.Context, id, ip string) error {
+	guid, err := guid.FromString(id)
+	if err != nil {
+		return fmt.Errorf("guid.FromString: %v", err)
+	}
+
+	mail, err := as.repo.GetEmail(ctx, guid)
+	if err != nil {
+		return err
+	}
+
+	return smtp.SendMail(
+		fmt.Sprintf("%v:%v", as.conf.SMTP.Hostname, as.conf.SMTP.Port),
+		as.auth,
+		as.conf.SMTP.Username,
+		[]string{mail},
+		[]byte(fmt.Sprintf("Subject: Warning\nSomeone tried to accces your account from %v\n", ip)),
+	)
 }
