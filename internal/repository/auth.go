@@ -119,6 +119,7 @@ func (ar *AuthRepository) Create(ctx context.Context, refresh models.InRefresh) 
 }
 
 // Для текущего пользователя получаем запись о выбанном в последний раз refresh-токене
+// TODO: добавить проверку на существование пользователя
 func (ar *AuthRepository) Get(ctx context.Context, id guid.GUID) (models.OutRefresh, error) {
 	query := `
 	SELECT *
@@ -142,6 +143,9 @@ func (ar *AuthRepository) Get(ctx context.Context, id guid.GUID) (models.OutRefr
 		&refresh.Cost,
 	)
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return models.OutRefresh{}, ErrUserNotFound
+		}
 		return models.OutRefresh{}, fmt.Errorf("row.Scan: %v", err)
 	}
 

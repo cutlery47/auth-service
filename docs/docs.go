@@ -18,7 +18,7 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
-        "/auth": {
+        "/api/v1/auth": {
             "get": {
                 "tags": [
                     "Auth"
@@ -61,7 +61,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/refresh": {
+        "/api/v1/refresh": {
             "get": {
                 "tags": [
                     "Auth"

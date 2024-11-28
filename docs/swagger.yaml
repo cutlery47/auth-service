@@ -19,7 +19,7 @@ info:
   title: Authentication Service
   version: 0.0.1
 paths:
-  /auth:
+  /api/v1/auth:
     get:
       parameters:
       - description: user guid
@@ -47,7 +47,7 @@ paths:
       summary: Create Tokens
       tags:
       - Auth
-  /refresh:
+  /api/v1/refresh:
     get:
       parameters:
       - description: user guid

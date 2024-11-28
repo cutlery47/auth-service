@@ -8,12 +8,12 @@ import (
 )
 
 var errMap = map[error]*echo.HTTPError{
-	repository.ErrNotFound:    echo.ErrNotFound,
-	service.ErrRefreshInvalid: echo.ErrBadRequest,
-	service.ErrRefreshExpired: echo.ErrBadRequest,
-	service.ErrWrongRefresh:   echo.ErrBadRequest,
-	service.ErrWrongIp:        echo.ErrUnauthorized,
-	service.ErrMalformedToken: echo.ErrNotAcceptable,
+	repository.ErrUserNotFound: echo.ErrNotFound,
+	service.ErrRefreshInvalid:  echo.ErrBadRequest,
+	service.ErrRefreshExpired:  echo.ErrBadRequest,
+	service.ErrWrongRefresh:    echo.ErrBadRequest,
+	service.ErrWrongIp:         echo.ErrUnauthorized,
+	service.ErrMalformedToken:  echo.ErrNotAcceptable,
 }
 
 type errMapper struct {

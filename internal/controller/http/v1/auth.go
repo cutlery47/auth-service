@@ -35,7 +35,7 @@ type response struct {
 // @Failure	400	{object}	echo.HTTPError
 // @Failure	404	{object}	echo.HTTPError
 // @Failure	500	{object}	echo.HTTPError
-// @Router /auth [get]
+// @Router		/api/v1/auth [get]
 func (r *authRoutes) createTokens(c echo.Context) error {
 	response := response{}
 
@@ -66,14 +66,14 @@ func (r *authRoutes) createTokens(c echo.Context) error {
 	return c.JSON(200, response)
 }
 
-// @Summary		Refresh Tokens
+// @Summary	Refresh Tokens
 // @Tags		Auth
 // @Param		id		query		string	true	"user guid"
 // @Param		refresh	query		string	true	"refresh token"
-// @Success		200		{object}	response
-// @Failure		400		{object}	echo.HTTPError
-// @Failure		500		{object}	echo.HTTPError
-// @Router /refresh [get]
+// @Success	200		{object}	response
+// @Failure	400		{object}	echo.HTTPError
+// @Failure	500		{object}	echo.HTTPError
+// @Router		/api/v1/refresh [get]
 func (r *authRoutes) refreshTokens(c echo.Context) error {
 	response := response{}
 

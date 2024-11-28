@@ -51,7 +51,7 @@ func (mr *MockRepository) Get(ctx context.Context, id guid.GUID) (models.OutRefr
 		}
 	}
 
-	return models.OutRefresh{}, ErrNotFound
+	return models.OutRefresh{}, ErrUserNotFound
 }
 
 func (mr *MockRepository) GetEmail(ctx context.Context, id guid.GUID) (string, error) {
