@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 
+	"github.com/Microsoft/go-winio/pkg/guid"
 	"github.com/cutlery47/auth-service/internal/config"
 	"github.com/cutlery47/auth-service/internal/repository"
 	"github.com/cutlery47/auth-service/internal/service"
@@ -27,5 +28,19 @@ func Run() {
 		log.Fatal("error when initializing app: ", err)
 	}
 
-	_ = service.NewAuthService(repo, conf.Service)
+	srv := service.NewAuthService(repo, conf.Service)
+
+	id, _ := guid.NewV4()
+	ip := "localhost"
+
+	_, refresh, err := srv.Create(ctx, id, ip)
+	if err != nil {
+		log.Fatal("error: ", err)
+	}
+
+	_, _, err = srv.Refresh(ctx, id, "localhost", refresh)
+	if err != nil {
+		log.Fatal("error: ", err)
+	}
+
 }

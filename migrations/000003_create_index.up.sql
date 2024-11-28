@@ -1,1 +1,0 @@
-CREATE INDEX IF NOT EXISTS refresh_userid_idx ON auth_schema.refresh (user_id);

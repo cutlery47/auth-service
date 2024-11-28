@@ -114,19 +114,7 @@ func (as *AuthService) Refresh(ctx context.Context, id guid.GUID, ip, refresh st
 
 	}
 
-	refreshId, _ := refreshClaims["id"].(string)
-	refreshIp, _ := refreshClaims["ip"].(string)
-
-	// Сверяем ip-адрес внутри токена с адресом, с которого поступил запрос
-	// В случае несовпадения - посылаем письмо на почту пользователя, id которого указан в токене
-	// В принципе, можно было отслылать письма асинхронно, но в данном случае решил не заморачиваться
-	if ip != refreshIp {
-		if err := as.sendWarning(ctx, refreshId, ip); err != nil {
-			return "", "", err
-		}
-		return "", "", ErrWrongIp
-	}
-
+	// Берем последний токен, отданный пользователю, из бд
 	storedRefresh, err := as.repo.Get(ctx, id)
 	if err != nil {
 		return "", "", err
@@ -154,6 +142,21 @@ func (as *AuthService) Refresh(ctx context.Context, id guid.GUID, ip, refresh st
 			return "", "", ErrWrongRefresh
 		}
 		return "", "", fmt.Errorf("bcrypt.CompareHashAndPassword: %v", err)
+	}
+
+	refreshId, _ := refreshClaims["id"].(string)
+	refreshIp, _ := refreshClaims["ip"].(string)
+
+	// Сверяем ip-адрес внутри токена с адресом, с которого поступил запрос
+	// В случае несовпадения - посылаем письмо на почту пользователя, id которого указан в токене
+	// В принципе, можно было бы брать ip-адрес получателя токена из бд, но т.к.
+	// мы заранее проверили токены на сходство - можем быть уверены, что в токене лежит исходный ip
+	// (к тому же пришлось бы хранить в таблице дополнительные данные)
+	if ip != refreshIp {
+		if err := as.sendWarning(ctx, refreshId, ip); err != nil {
+			return "", "", err
+		}
+		return "", "", ErrWrongIp
 	}
 
 	// валидация прошла успешно - создаем новую пару токенов
