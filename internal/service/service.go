@@ -1,6 +1,8 @@
 package service
 
 import (
+	"crypto/sha512"
+	"errors"
 	"fmt"
 
 	"github.com/Microsoft/go-winio/pkg/guid"
@@ -13,7 +15,7 @@ import (
 )
 
 type Service interface {
-	Auth(id guid.GUID, ip string) (access, refresh string, err error)
+	Create(id guid.GUID, ip string) (access, refresh string, err error)
 	Refresh(id guid.GUID, ip, refresh string) (newAccess, newRefresh string, err error)
 }
 
@@ -22,27 +24,43 @@ type AuthService struct {
 	conf config.Service
 }
 
-func (as *AuthService) Auth(id guid.GUID, ip string) (access, refresh string, err error) {
-	accessClaims := NewClaims(id, ip, as.conf.AccessTTL)
-	refreshClaims := NewClaims(id, ip, as.conf.RefreshTTL)
+func New(repo repository.Repository, conf config.Service) *AuthService {
+	return &AuthService{
+		repo: repo,
+		conf: conf,
+	}
+}
 
-	accessToken := as.generateToken(*accessClaims)
-	refreshToken := as.generateToken(*refreshClaims)
+func (as *AuthService) Create(id guid.GUID, ip string) (access, refresh string, err error) {
+	// создаем access и refresh JWT-токены
+	accessToken := generateToken(id, ip, as.conf.AccessTTL)
+	refreshToken := generateToken(id, ip, as.conf.RefreshTTL)
 
-	signedAccess, err := accessToken.SignedString(as.conf.Secret)
+	// подписываем созданные токены
+	signedAccess, err := accessToken.SignedString([]byte(as.conf.Secret))
 	if err != nil {
 		return "", "", fmt.Errorf("accessToken.SignedString: %v", err)
 	}
 
-	signedRefresh, err := refreshToken.SignedString(as.conf.Secret)
+	signedRefresh, err := refreshToken.SignedString([]byte(as.conf.Secret))
 	if err != nil {
 		return "", "", fmt.Errorf("refreshToken.SignedString: %v", err)
 	}
 
+	// добавляем соль к refresh-токену
 	salt := uuid.New()
 	saltedRefresh := fmt.Sprintf("%v:%v", salt, signedRefresh)
 
-	hashedRefresh, err := bcrypt.GenerateFromPassword([]byte(saltedRefresh), as.conf.Cost)
+	// так как bcrypt принимает строки длины до 72 символов,
+	// хэшиурем засоленный refresh-токен
+	hasher := sha512.New()
+	if _, err := hasher.Write([]byte(saltedRefresh)); err != nil {
+		return "", "", fmt.Errorf("hasher.Write: %v", err)
+	}
+	truncatedRefresh := hasher.Sum(nil)
+
+	// хэшируем refresh-токен bcrypt-ом
+	hashedRefresh, err := bcrypt.GenerateFromPassword(truncatedRefresh, as.conf.Cost)
 	if err != nil {
 		return "", "", fmt.Errorf("bcrypt.GenerateFromPassword: %v", err)
 	}
@@ -54,6 +72,7 @@ func (as *AuthService) Auth(id guid.GUID, ip string) (access, refresh string, er
 		Cost:   as.conf.Cost,
 	}
 
+	// заносим информацию о новом refresh-токене в хранилище
 	if err := as.repo.Create(inRefresh); err != nil {
 		return "", "", err
 	}
@@ -62,18 +81,67 @@ func (as *AuthService) Auth(id guid.GUID, ip string) (access, refresh string, er
 }
 
 func (as *AuthService) Refresh(id guid.GUID, ip, refresh string) (newAccess, newRefresh string, err error) {
-	return "", "", nil
+	refreshClaims := jwt.MapClaims{}
+
+	// Парсинг и валидация refresh-токена
+	_, err = jwt.ParseWithClaims(refresh, refreshClaims, func(t *jwt.Token) (interface{}, error) {
+		return []byte(as.conf.Secret), nil
+	})
+	if err != nil {
+		switch {
+		// проверка на время жизни токена
+		case errors.Is(err, jwt.ErrTokenExpired):
+			return "", "", ErrRefreshExpired
+		// проверка на структуру токена
+		case errors.Is(err, jwt.ErrTokenMalformed):
+			return "", "", ErrMalformedToken
+		default:
+			return "", "", fmt.Errorf("jwt.ParseWithClaims: %v", err)
+		}
+
+	}
+
+	refreshId, _ := refreshClaims["id"].(string)
+	refreshIp, _ := refreshClaims["ip"].(string)
+
+	// Сверяем ip-адрес внутри токена с адресом, с которого поступил запрос
+	// В случае несовпадения - посылаем письмо на почту пользователя, id которого указан в токене
+	if ip != refreshIp {
+		return "", "", as.sendWarning(refreshId)
+	}
+
+	storedRefresh, err := as.repo.Get(id)
+	if err != nil {
+		return "", "", err
+	}
+
+	// Проверяем, сходится ли токен, полученный от пользователя с токеном, лежащим в БД
+	// Для этого, нам нужно:
+	// 1) К полученному токену добавить ту же соль, которая использовалась изначально
+	// 2) Захэшировать полученный токен при помощи SHA512
+	// 3) Сравнить bcrypt-хэши
+
+	// Добавляем соль
+	saltedRefresh := fmt.Sprintf("%v:%v", storedRefresh.Salt, refresh)
+
+	// SHA512-хэш
+	hasher := sha512.New()
+	if _, err := hasher.Write([]byte(saltedRefresh)); err != nil {
+		return "", "", fmt.Errorf("hasher.Write: %v", err)
+	}
+	truncatedRefresh := hasher.Sum(nil)
+
+	// bcrypt-хэш
+	if err := bcrypt.CompareHashAndPassword(storedRefresh.Hash, []byte(truncatedRefresh)); err != nil {
+		if errors.Is(err, bcrypt.ErrMismatchedHashAndPassword) {
+			return "", "", ErrWrongRefresh
+		}
+		return "", "", fmt.Errorf("bcrypt.CompareHashAndPassword: %v", err)
+	}
+
+	return as.Create(id, ip)
 }
 
-func (as *AuthService) generateToken(claims tokenClaims) *jwt.Token {
-	return jwt.NewWithClaims(
-		jwt.SigningMethodHS512,
-		jwt.MapClaims{
-			"ip":  claims.ip,
-			"id":  claims.id,
-			"exp": claims.exp,
-			"iat": claims.iat,
-			"iss": claims.iss,
-		},
-	)
+func (as *AuthService) sendWarning(id string) error {
+	return ErrWrongIp
 }

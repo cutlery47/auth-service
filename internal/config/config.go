@@ -3,6 +3,7 @@ package config
 import "time"
 
 type Config struct {
+	Mode string
 	Service
 }
 

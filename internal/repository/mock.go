@@ -13,6 +13,13 @@ type MockRepository struct {
 	mu     *sync.RWMutex
 }
 
+func NewMock() *MockRepository {
+	return &MockRepository{
+		tokens: []models.OutRefresh{},
+		mu:     &sync.RWMutex{},
+	}
+}
+
 func (mr *MockRepository) Create(refresh models.InRefresh) error {
 	id := uuid.New()
 
