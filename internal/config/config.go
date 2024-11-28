@@ -11,6 +11,7 @@ type Config struct {
 	Service
 	Repository
 	Logger
+	HTTPServer
 }
 
 type Service struct {
@@ -46,6 +47,14 @@ type Postgres struct {
 type Logger struct {
 	InfoPath  string `env:"LOGGER_INFO_PATH"`
 	ErrorPath string `env:"LOGGER_ERROR_PATH"`
+}
+
+type HTTPServer struct {
+	Interface       string        `env:"SERVER_INTERFACE"`
+	Port            string        `env:"SERVER_PORT"`
+	ReadTimeout     time.Duration `env:"SERVER_READ_TIMEOUT"`
+	WriteTimeout    time.Duration `env:"SERVER_WRITE_TIMEOUT"`
+	ShutdownTimeout time.Duration `env:"SERVER_SHUTDOWN_TIMEOUT"`
 }
 
 func New() (*Config, error) {

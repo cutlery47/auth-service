@@ -1,7 +1,11 @@
 package main
 
-import "github.com/cutlery47/auth-service/internal/app"
+import (
+	"log"
+
+	"github.com/cutlery47/auth-service/internal/app"
+)
 
 func main() {
-	app.Run()
+	log.Fatal("error: ", app.Run())
 }
