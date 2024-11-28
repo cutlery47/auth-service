@@ -1,6 +1,7 @@
 package v1
 
 import (
+	_ "github.com/cutlery47/auth-service/docs"
 	"github.com/cutlery47/auth-service/internal/service"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"

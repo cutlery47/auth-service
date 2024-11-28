@@ -14,7 +14,18 @@ import (
 	"github.com/cutlery47/auth-service/pkg/logger"
 	"github.com/labstack/echo/v4"
 	"github.com/sirupsen/logrus"
+
+	_ "github.com/cutlery47/auth-service/docs"
 )
+
+//	@title			Authentication Service
+//	@version		0.0.1
+//	@description	This is an authentication service
+
+//	@contact.name	Ivanchenko Arkhip
+//	@contact.email	kitchen_cutlery@mail.ru
+
+//	@BasePath	/
 
 func Run() error {
 	ctx := context.Background()

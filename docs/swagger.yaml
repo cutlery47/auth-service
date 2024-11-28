@@ -1,0 +1,79 @@
+basePath: /
+definitions:
+  echo.HTTPError:
+    properties:
+      message: {}
+    type: object
+  internal_controller_http_v1.response:
+    properties:
+      access:
+        type: string
+      refresh:
+        type: string
+    type: object
+info:
+  contact:
+    email: kitchen_cutlery@mail.ru
+    name: Ivanchenko Arkhip
+  description: This is an authentication service
+  title: Authentication Service
+  version: 0.0.1
+paths:
+  /auth:
+    get:
+      parameters:
+      - description: user guid
+        in: query
+        name: id
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_controller_http_v1.response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/echo.HTTPError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/echo.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/echo.HTTPError'
+      summary: Create Tokens
+      tags:
+      - Auth
+  /refresh:
+    get:
+      parameters:
+      - description: user guid
+        in: query
+        name: id
+        required: true
+        type: string
+      - description: refresh token
+        in: query
+        name: refresh
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_controller_http_v1.response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/echo.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/echo.HTTPError'
+      summary: Refresh Tokens
+      tags:
+      - Auth
+swagger: "2.0"

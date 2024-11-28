@@ -2,6 +2,7 @@ package v1
 
 import (
 	"github.com/Microsoft/go-winio/pkg/guid"
+	_ "github.com/cutlery47/auth-service/docs"
 	"github.com/cutlery47/auth-service/internal/service"
 	"github.com/labstack/echo/v4"
 	rip "github.com/vikram1565/request-ip"
@@ -22,8 +23,21 @@ func newAuthRoutes(g *echo.Group, srv service.Service, e *errMapper) {
 	g.GET("/refresh", r.refreshTokens)
 }
 
+type response struct {
+	Access  string
+	Refresh string
+}
+
+// @Summary	Create Tokens
+// @Tags		Auth
+// @Param		id	query		string	true	"user guid"
+// @Success	200	{object}	response
+// @Failure	400	{object}	echo.HTTPError
+// @Failure	404	{object}	echo.HTTPError
+// @Failure	500	{object}	echo.HTTPError
+// @Router /auth [get]
 func (r *authRoutes) createTokens(c echo.Context) error {
-	response := make(map[string]string)
+	response := response{}
 
 	ctx := c.Request().Context()
 	id := c.QueryParam("id")
@@ -46,14 +60,22 @@ func (r *authRoutes) createTokens(c echo.Context) error {
 		return r.e.Map(err)
 	}
 
-	response["access"] = access
-	response["refresh"] = refresh
+	response.Access = access
+	response.Refresh = refresh
 
 	return c.JSON(200, response)
 }
 
+// @Summary		Refresh Tokens
+// @Tags		Auth
+// @Param		id		query		string	true	"user guid"
+// @Param		refresh	query		string	true	"refresh token"
+// @Success		200		{object}	response
+// @Failure		400		{object}	echo.HTTPError
+// @Failure		500		{object}	echo.HTTPError
+// @Router /refresh [get]
 func (r *authRoutes) refreshTokens(c echo.Context) error {
-	response := make(map[string]string)
+	response := response{}
 
 	ctx := c.Request().Context()
 	id := c.QueryParam("id")
@@ -84,8 +106,8 @@ func (r *authRoutes) refreshTokens(c echo.Context) error {
 		return r.e.Map(err)
 	}
 
-	response["access"] = access
-	response["refresh"] = refresh
+	response.Access = access
+	response.Refresh = refresh
 
 	return c.JSON(200, response)
 }
