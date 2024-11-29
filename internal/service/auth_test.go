@@ -86,6 +86,7 @@ func TestWrongToken(t *testing.T) {
 	}
 }
 
+// тест попытки рефрешнуть рандомный набор символов
 func TestMalformedToken(t *testing.T) {
 	ctx := context.Background()
 
@@ -109,6 +110,7 @@ func TestMalformedToken(t *testing.T) {
 	}
 }
 
+// тест попытки рефрешнуть токен с несуществующим id
 func TestUnexistantId(t *testing.T) {
 	ctx := context.Background()
 
@@ -133,6 +135,7 @@ func TestUnexistantId(t *testing.T) {
 	}
 }
 
+// тест попытки рефрешнуть токен с неправильным id
 func TestWrongId(t *testing.T) {
 	ctx := context.Background()
 
@@ -163,6 +166,7 @@ func TestWrongId(t *testing.T) {
 	}
 }
 
+// тест попытки рефрешнуть токен с неправильным ip
 func TestWrongIp(t *testing.T) {
 	ctx := context.Background()
 
